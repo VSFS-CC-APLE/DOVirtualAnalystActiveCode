@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CENTCOM J-2 APLE Virtual Analyst</title>
+    <link rel="stylesheet" href="IntelligenceProductPages.css"> <!-- External CSS for styling -->
+</head>
+<body>
+    <header>
+        <h1>CENTCOM J-2 APLE Virtual Analyst</h1>
+    </header>
+    <main>
+        <nav>
+            <h2>Website Menu:</h2>
+            <ul>
+                <li><a href="home.html">Home</a></li>
+                <li><a href="IndexPlugin.html">MIUs (Old Format)</a></li>
+                <li><a href="ATS.html">ATS Analysis</a></li>
+                <li><a id="intelligenceNotesLink" href="intelligenceNotes.html">Intelligence Notes</a></li>
+                <!-- Add more menu items as needed -->
+            </ul>
+        </nav>
+        <div id="form-container">
+           <h2>Create an Intelligence Paper:</h2>
+            <section>
+                <p>Enter a URL as an Intelligence Paper source:</p>
+                <form id="urlFormIntelligencePaper">
+                    <input type="url" id="urlInputIntelligencePaper" placeholder="Enter a URL" required>
+                    <button type="submit">Get Paper</button>
+                </form>
+            </section>
+            <section>
+                <p>Or upload a .DOCX/.PDF file as an Intelligence Paper source:</p>
+                <form id="fileFormIntelligencePaper" method="post" enctype="multipart/form-data">
+                    <input type="file" name="file" accept=".docx, .pdf" />
+                    <input type="submit" value="Upload File" />
+                </form>
+            </section>
+            <section>
+                <h2>Finished Intelligence Paper (ICD 203 Compliant):</h2>
+                <textarea id="summaryOutputIntelligencePaper" rows="10" cols="80" readonly></textarea>
+                <h2>Corresponding Analytic Tradecraft Summary:</h2>
+                <textarea id="secondSummaryOutputIntelligencePaper" rows="10" cols="80" readonly></textarea>
+                <button id="downloadButtonIntelligencePaper">Download DOCX</button>
+                <button id="generatePdfButtonIntelligencePaper">Download PDF</button>
+                <section>
+                    <div id="loadingIntelligencePaper" style="display:none;">Loading...</div>
+                </section>
+            </section>                       
+        </div>
+        <div id="footer-container">
+            <f1>Note: The prompt being used is engineered to produce results in the Intelligence Paper format. As such any documents/urls uploaded that do not read like news articles or fact-based reporting will result in less accurate/improperly formatted outputs from ChatGPT. To ensure the best results, use only sources relevant to the style/content of Intelligence Papers as inputs.</f1>
+        </div>
+        <br>
+        <br>
+    </main>
+   <script>
+    // Send Reference Docs When click to use Intelligence Notes Page
+    document.getElementById('intelligenceNotesLink').addEventListener('click', function(event) {
+            event.preventDefault(); // Prevent the default behavior of the link
+            fetchIntelligenceNotes();
+        });
+    
+        async function fetchIntelligenceNotes() {
+            try {
+            const response = await axios.get('/fetchIntelligenceNotes'); // Send a request to the server-side endpoint
+            console.log('Response from server:', response.data);
+            // Process the response as needed
+            // Redirect to the intelligenceNotes.html page after processing
+            window.location.href = '/intelligenceNotes.html';
+            } catch (error) {
+            console.error('Error fetching intelligence notes:', error);
+            // Handle errors as needed
+            }
+        }
+
+       // Function to format the summary according to ICD 203 standards
+    function formatSummaryAccordingToICD203IntelligencePaper(summary) {
+        return summary;
+    }
+
+    document.getElementById('urlFormIntelligencePaper').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const url = document.getElementById('urlInputIntelligencePaper').value;
+    const loadingElement = document.getElementById('loadingIntelligencePaper');
+    loadingElement.style.display = 'block';
+
+    try {
+        const response = await fetch('/chatIntelligencePaper', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Display the first response in the summaryOutputIntelligencePaper textarea
+        const formattedSummary = formatSummaryAccordingToICD203IntelligencePaper(data.message);
+        document.getElementById('summaryOutputIntelligencePaper').value = formattedSummary;
+        
+    } catch (error) {
+        console.error('Error fetching summary:', error);
+        document.getElementById('summaryOutputIntelligencePaper').value = `Error fetching summary: ${error.message}`;
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+});
+
+// Function to fetch the second response from the server
+async function fetchSecondResponse() {
+    try {
+        const response = await fetch('/getLastResponseATSIntelligencePaper');
+        const data = await response.json();
+
+        if (data.lastResponseATSIntelligencePaper) {
+            // Display the second response in the secondSummaryOutputIntelligencePaper textarea
+            const formattedSecondSummary = formatSummaryAccordingToICD203IntelligencePaper(data.lastResponseATSIntelligencePaper);
+            document.getElementById('secondSummaryOutputIntelligencePaper').value = formattedSecondSummary;
+        } else {
+            // If there's no second response, clear the second textarea
+            document.getElementById('secondSummaryOutputIntelligencePaper').value = '';
+        }
+    } catch (error) {
+        console.error('Error fetching second response:', error);
+    }
+}
+
+// Function to repeatedly fetch the second response
+async function pollForSecondResponse() {
+    // Fetch the second response initially
+    await fetchSecondResponse();
+
+    // Set up a loop to poll for updates every few seconds
+    setInterval(fetchSecondResponse, 5000); // Poll every 5 seconds
+}
+
+// Call the function to start polling for the second response
+pollForSecondResponse();
+
+
+    const form = document.getElementById('fileFormIntelligencePaper');
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const loadingElement = document.getElementById('loadingIntelligencePaper');
+        loadingElement.style.display = 'block';
+
+        try {
+            const response = await fetch('/upload-fileIntelligencePaper', {
+                method: 'POST',
+                body: formData, // No headers here, as fetch adds the correct one for FormData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const formattedSummary = formatSummaryAccordingToICD203IntelligencePaper(data.message);
+            document.getElementById('summaryOutputIntelligencePaper').value = formattedSummary;
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            document.getElementById('summaryOutputIntelligencePaper').value = `Error uploading file: ${error.message}`;
+        } finally {
+            loadingElement.style.display = 'none';
+        }
+    });
+
+    document.getElementById('downloadButtonIntelligencePaper').addEventListener('click', async () => {
+                try {
+                    // Send a GET request to the server to trigger the download
+                    const response = await fetch('/downloadIntelligencePaper', {
+                        method: 'GET',
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Convert the response into a blob and create a download link
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'Intelligence Paper.docx';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } catch (error) {
+                    console.error('Error downloading file:', error);
+                }
+            });
+
+
+     // Client-side JavaScript to trigger the PDF generation on button click
+     document.getElementById('generatePdfButtonIntelligencePaper').addEventListener('click', () => {
+            // Make a GET request to your server endpoint that generates the PDF
+            fetch('/downloadIntelligencePaperPDF', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/pdf', // Specify the desired response content type
+                },
+            })
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.blob();
+            })
+            .then((blob) => {
+                // Create a temporary link to trigger the download of the PDF
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Intelligence Paper.pdf'; // Specify the desired file name
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                // Handle the error as needed (e.g., display an error message)
+            });
+        });
+    
+    </script>
+</body>
+</html>
