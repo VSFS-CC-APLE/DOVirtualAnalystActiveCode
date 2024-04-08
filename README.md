@@ -1,7 +1,7 @@
 # DOVirtualAnalystActiveCode
 The actively running codebase for the virtual analyst tool.
 
-Link to application:
+Link to application: https://octopus-app-dbhy7.ondigitalocean.app/.
 
 **PLEASE DO NOT UPDATE THIS CODE WITHOUT TESTING CODE FIRST**
 
