@@ -55,26 +55,7 @@
         <br>
         <br>
     </main>
-   <script>
-    // Send Reference Docs When click to use Intelligence Notes Page
-    document.getElementById('intelligenceNotesLink').addEventListener('click', function(event) {
-            event.preventDefault(); // Prevent the default behavior of the link
-            fetchIntelligenceNotes();
-        });
-    
-        async function fetchIntelligenceNotes() {
-            try {
-            const response = await axios.get('/fetchIntelligenceNotes'); // Send a request to the server-side endpoint
-            console.log('Response from server:', response.data);
-            // Process the response as needed
-            // Redirect to the intelligenceNotes.html page after processing
-            window.location.href = '/intelligenceNotes.html';
-            } catch (error) {
-            console.error('Error fetching intelligence notes:', error);
-            // Handle errors as needed
-            }
-        }
-
+   <script
        // Function to format the summary according to ICD 203 standards
     function formatSummaryAccordingToICD203IntelligencePaper(summary) {
         return summary;
