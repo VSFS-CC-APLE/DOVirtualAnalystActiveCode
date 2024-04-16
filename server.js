@@ -66,6 +66,8 @@ let lastResponse = ''; // For Old MIUs
 
 let lastresponseATS = ``; // For ATS
 
+let lastResponseTalkingPoints = ``; // For Talking Points
+
 //Variables for Intelligence Product Prompts://
 
 // ATS System Prompt//
@@ -359,7 +361,16 @@ Also, internalize the following format; do not write anything yet. This is calle
 
   A reminder you must follow and operate under MIU Format: the header, the body, sub bullet if necessary, and analyst comment.`;
 
-// Reference Doocument Varaiables//
+//Talking Points System Prompt//
+
+const TalkingPointsFormatText = `Internalize the prompt and do not write anything yet. Make talking points that summarize given each text. Start each talking point with a date as below in the format of (U) On 2 DEC, where 2 is the day and DEC is the abbreviation for the month. Talking points should be three events/ bullets maximum. Here is an example.
+
+(U) On 2 DEC, Israel launched airstrikes against Hezbollah targets in Damascus, resulting in the death of two Iranian Revolutionary Guard Corps members
+
+(U) On 29 NOV, Iran-backed proxy groups launched a rocket targeting US-led Coalition Forces at Mission Support Site Euphrates in eastern Syria, causing no casualties or damage.
+
+(U) On 28 NOV, Russian and Syrian forces conducted joint airstrikes against ISIS positions in the Al-Bashri desert of Deir-ez-Zor.`;
+  // Reference Doocument Varaiables//
 
 const ICDStandards = `Please internalize the following documents for reference. Once you have received them please respond only with the following text 'Received.' Document #1 is called Intelligence Community Directive 203 Standards and contains the following information:
 
@@ -805,6 +816,82 @@ app.post('/chatIntelligencePaper', async (req, res) => {
   }
 });
 
+//Talking Points URL Upload Function//
+app.post('/chatTalkingPoints', async (req, res) => {
+  try {
+      const url = req.body.url;
+     
+      if (!url || !url.startsWith('http')) {
+          res.status(400).json({ error: 'Invalid URL' });
+          return;
+        }
+
+      // Fetch and parse the content of the webpage
+      const webpageResponse = await axios.get(url);
+      logActivity(`Fetched content from ${url}`);
+      const $ = cheerio.load(webpageResponse.data);
+
+      $('script').remove();
+      $('style').remove();
+      $('.ad').remove();          // Removes elements with class "ad"
+      $('#ad-container').remove(); // Removes element with id "ad-container"
+      $('iframe').remove();       // Removes all iframe elements, which are sometimes used for ads
+      $('.popup').remove();  // Removes elements with class "popup"
+      $('#somePopupId').remove();  // Removes element with id "somePopupId"
+      $('.hidden').remove();  // Removes elements with class "hidden"
+      $('[hidden="true"]').remove();  // Removes elements with attribute hidden="true"
+      $('[style*="display: none"]').remove();  // Removes elements with inline style display: none
+      $('[style*="visibility: hidden"]').remove();  // Removes elements with inline style visibility: hidden
+
+      const webpageText = $('body').text();
+      
+
+      // Send the content to Chat GPT for summarization
+      const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: 'gpt-3.5-turbo-1106',
+        messages: [{
+            role: "system",
+            content: TalkingPointsFormatText  // Referencing the TalkingPointsFormatText variable here
+        }, {
+              role: "user",
+              content: `Following the standards of U.S. Intelligence Community Directive 203, the U.S. Defense Intelligence Agency's style guide, and the format you internalized, write Talking Points using the following content as your source: ${webpageText}`
+          }],
+          max_tokens: 1000
+      }, {
+          headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+          }
+      });
+
+      if (response.data.choices && response.data.choices[0] && response.data.choices[0].message && response.data.choices[0].message.content) {
+          const chatResponseTalkingPoints = response.data.choices[0].message.content.trim();
+          
+          // Store the response in lastResponse
+          lastResponseTalkingPoints = chatResponseTalkingPoints;
+
+          // Add a console log to indicate when the variable is saved
+          console.log('lastResponseTalkingPoints has been updated:', lastResponseTalkingPoints);
+          
+          logActivity(`Successfully summarized content from ${url}`);
+          res.json({ message: chatResponseTalkingPoints });
+      } else {
+          throw new Error("Unexpected response structure from OpenAI API.");
+      }
+
+  } catch (error) {
+      logActivity(`Error processing /chatTalkingPoints request: ${error.message}`);
+      console.error("Error processing /chatTalkingPoints request:", error);
+      if (error.response && error.response.data && error.response.data.error) {
+          logActivity(`OpenAI API Error: ${error.response.data.error}`);
+          console.error("OpenAI API Error:", error.response.data.error);
+      } else {
+          logActivity(`General Error: ${error.message}`);
+      }
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
 // Function to extract text from PDF files
 async function extractTextFromPDF(pdfPath) {
     const dataBuffer = fs.readFileSync(pdfPath);
@@ -1188,6 +1275,81 @@ const processTextATS = async (text) => {
   }
 };
 
+// Talking Points Docx and PDF Upload Function//
+
+app.post('/upload-fileTalkingPoints', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+      logActivity('No file uploaded.');
+      return res.status(400).json({ error: 'No file uploaded.' });
+  }
+
+  const fileType = req.file.mimetype;
+  let text;
+  
+  try {
+      if (fileType === 'application/pdf') {
+          // Handle PDF file
+          logActivity('Processing PDF file upload.');
+          text = await extractTextFromPDF(req.file.path);
+      } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          // Handle DOCX file
+          logActivity('Processing DOCX file upload.');
+          text = await extractTextFromDOCX(req.file.path);
+      } else {
+          throw new Error('Unsupported file type.');
+      }
+
+      logActivity('Sending extracted text to ChatGPT.');
+      const processedText = await processTextTalkingPoints(text); // Assuming processText sends to ChatGPT
+      
+      // Store the response in lastResponseATS
+      lastResponseTalkingPoints = processedText;
+
+      // Add a console log to indicate when the variable is saved
+      console.log('lastresponseTalkingPoints has been updated:', lastResponseTalkingPoints);
+      
+      logActivity('Received response from ChatGPT.');
+      res.json({ message: processedText }); // Send a JSON response
+  } catch (error) {
+      logActivity(`Error processing text: ${error.message}`);
+      res.status(500).json({ error: `Error processing text: ${error.message}` }); // Send a JSON error response
+  } finally {
+      // Clean up the uploaded file
+      fs.unlinkSync(req.file.path);
+      logActivity('Cleaned up uploaded file.');
+  }
+});
+
+const processTextTalkingPoints = async (text) => {
+try {
+  const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+    model: 'gpt-3.5-turbo-1106',
+    messages: [{
+      role: "system",
+      content: TalkingPointsFormatText  // Referencing the miuFormatText variable here
+    }, {
+      role: "user",
+      content: `Use that internalized format and instructions to create Talking Points from the following source: ${text}`
+    }],
+    max_tokens: 1000
+  }, {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (response.data.choices && response.data.choices[0] && response.data.choices[0].message && response.data.choices[0].message.content) {
+    return response.data.choices[0].message.content.trim();
+  } else {
+    throw new Error("Unexpected response structure from OpenAI API.");
+  }
+} catch (error) {
+  console.error('Error processing text:', error);
+  throw error; // Rethrow the error to handle it in the calling function
+}
+};
+
   // Download Response as Docx Function //
 
   // Old MIU Reports Function //
@@ -1320,6 +1482,40 @@ app.get('/downloadATS', (req, res) => {
 
       // Set response headers for downloading the file
       res.setHeader('Content-Disposition', 'attachment; filename=Analytic Tradecraft Summary.docx');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.send(buffer);
+  } catch (error) {
+      console.error('Error generating and sending DOCX file:', error);
+      res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// Talking Points //
+
+app.get('/downloadTalkingPoints', (req, res) => {
+  try {
+      // Check if lastTalkingPoints is empty or null
+      if (!lastResponseTalkingPoints) {
+          return res.status(400).json({ error: 'No data available for download.' });
+      }
+
+      // Create a new DOCX document using docxtemplater
+      const content = fs.readFileSync('TalkingPointsTemplate.docx', 'binary'); // Load your template file
+      const zip = new PizZip(content);
+      const doc = new Docxtemplater(zip);
+
+      // Replace the template variables with the data from lastresponseTalkingPoints
+      const data = {
+          content: lastResponseTalkingPoints // Assuming lastResponseTalkingPoints contains the data you want to insert into the document
+      };
+      doc.setData(data);
+      doc.render();
+
+      // Generate the DOCX file
+      const buffer = doc.getZip().generate({ type: 'nodebuffer' });
+
+      // Set response headers for downloading the file
+      res.setHeader('Content-Disposition', 'attachment; filename=Talking Points.docx');
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.send(buffer);
   } catch (error) {
@@ -1530,8 +1726,8 @@ app.get('/downloadIntelligencePaperPDF', async (req, res) => {
 // Define your route for generating and downloading PDF files
 app.get('/downloadATSPDF', async (req, res) => {
   try {
-    // Check if lastResponse is empty or null
-    if (!lastResponse) {
+    // Check if lastResponseATS is empty or null
+    if (!lastresponseATS) {
       return res.status(400).json({ error: 'No data available for download.' });
     }
 
@@ -1590,9 +1786,73 @@ app.get('/downloadATSPDF', async (req, res) => {
   }
 });
 
-  //Start-up and Shut-down Functions//
+// Talking Points //
 
- const server = app.listen(PORT, () => {
+// Define your route for generating and downloading PDF files
+app.get('/downloadTalkingPointsPDF', async (req, res) => {
+  try {
+    // Check if lastResponseTalkingPoints is empty or null
+    if (!lastResponseTalkingPoints) {
+      return res.status(400).json({ error: 'No data available for download.' });
+    }
+
+    // Create a new DOCX document using docxtemplater
+    const content = fs.readFileSync('TalkingPointsTemplate.docx', 'binary'); // Load your template file
+    const zip = new PizZip(content);
+    const doc = new Docxtemplater(zip);
+
+    // Replace the template variables with the data from lastresponseTalkingPoints
+    const data = {
+        content: lastResponseTalkingPoints // Assuming lastresponseTalkingPoints contains the data you want to insert into the document
+    };
+    doc.setData(data);
+    doc.render();
+
+    // Generate the DOCX buffer
+    console.log('Generating DOCX buffer...');
+    const docxBuffer = doc.getZip().generate({ type: 'nodebuffer' });
+    console.log('DOCX buffer filled with data.');
+
+    // Check if the DOCX buffer is empty
+    if (!docxBuffer || docxBuffer.length === 0) {
+      return res.status(500).json({ error: 'Empty DOCX buffer.' });
+    }
+
+    // Create a temporary DOCX file
+    const tempDocxPath = `${__dirname}/temp.docx`;
+    fs.writeFileSync(tempDocxPath, docxBuffer);
+
+    // Use mammoth to convert the temporary DOCX file to HTML
+    console.log('Converting DOCX to HTML...');
+    const { value: htmlContent } = await mammoth.convertToHtml({ path: tempDocxPath });
+    console.log('DOCX converted to HTML.');
+
+    // Delete the temporary DOCX file
+    fs.unlinkSync(tempDocxPath);
+
+    // Use puppeteer to convert HTML to PDF
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    await page.setContent(htmlContent);
+    const pdfBuffer = await page.pdf();
+
+    await browser.close();
+
+    // Set the response headers for downloading the PDF file
+    res.setHeader('Content-Disposition', 'attachment; filename=Talking Points.pdf');
+    res.setHeader('Content-Type', 'application/pdf');
+
+    // Send the generated PDF as the response
+    res.end(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generating and sending PDF file:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+  //Start-up and Shut-down Functions//
+const server = app.listen(PORT, () => {
     logActivity(`Server started on port ${PORT}`);
     
     // Log the port number
