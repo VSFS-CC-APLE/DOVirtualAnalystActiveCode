@@ -1845,17 +1845,17 @@ app.get('/downloadTalkingPointsPDF', async (req, res) => {
   }
 });
 
-  //Start-up and Shut-down Functions//
-const server = app.listen(PORT, () => {
+//Start up and Shut down//
+const server = app.listen(PORT, '0.0.0.0', () => {
     logActivity(`Server started on port ${PORT}`);
-    
-    // Log the port number
+
     console.log(`Server is running on port ${PORT}`);
 
     process.on('SIGTERM', () => {
         console.log('SIGTERM signal received. Shutting down gracefully.');
         server.close(() => {
-          console.log('Server closed');
+            console.log('Server closed');
         });
-    });      
+    });
 });
+
