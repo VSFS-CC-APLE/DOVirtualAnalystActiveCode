@@ -3,7 +3,6 @@ const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const path = require('path');
-const https = require('https');
 const fs = require('fs');
 const options = {
     key: fs.readFileSync(path.join(__dirname, 'key.pem'), 'utf8'),
