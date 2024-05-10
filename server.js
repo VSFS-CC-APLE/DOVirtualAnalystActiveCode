@@ -401,7 +401,7 @@ e. Implements and exhibits Analytic Tradecraft Standards, specifically:
 `;
 
 const app = express();
-const PORT = process.env.PORT || 80;
+const PORT = process.env.PORT || 8080;
 
 const apiKey = process.env.OPENAI_API_KEY;
 
