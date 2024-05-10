@@ -4,11 +4,6 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const path = require('path');
 const fs = require('fs');
-const options = {
-    key: fs.readFileSync(path.join(__dirname, 'key.pem'), 'utf8'),
-    cert: fs.readFileSync(path.join(__dirname, 'cert.pem'), 'utf8'),
-    passphrase: process.env.SSL_PASSPHRASE
-  };
 
 const rateLimit = require("express-rate-limit");
 const limiter = rateLimit({
