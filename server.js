@@ -404,7 +404,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Directly specify the API key
-const apiKey = "sk-proj-wIRD4Gar0u4TMw1K2nrTT3BlbkFJMEYladipfuxc3zvdQ8ie";
+const apiKey = "";
 
 if (!apiKey) {
     console.error('API key is undefined!');
