@@ -404,6 +404,9 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) {
+    console.error('API key is undefined!');
+}
 
 app.use(express.json());
 app.use(express.static('.'));
