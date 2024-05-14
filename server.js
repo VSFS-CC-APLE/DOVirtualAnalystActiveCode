@@ -403,9 +403,7 @@ e. Implements and exhibits Analytic Tradecraft Standards, specifically:
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Directly specify the API key
-const apiKey = "";
-
+const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
     console.error('API key is undefined!');
 }
